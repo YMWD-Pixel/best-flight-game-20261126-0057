@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Azure Isles — Sky Courier</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0e2a3d; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  #game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  /* Read aloud, never shown: the status line screen readers announce. */
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  .hud { position: absolute; inset: 0; pointer-events: none; color: #eef4f8; display: none; text-shadow: 0 1px 3px rgba(0,0,0,.65); }
+  .hud.visible { display: block; }
+  .hud-panel { position: absolute; top: 14px; background: rgba(8, 28, 40, .55); border: 1px solid rgba(255,255,255,.22); border-radius: 10px; padding: 10px 14px; backdrop-filter: blur(2px); }
+  .hud-tl { left: 14px; min-width: 132px; }
+  .hud-tr { right: 14px; min-width: 170px; text-align: right; }
+  .hud-big { font-size: 30px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .hud-label { font-size: 10px; letter-spacing: .14em; color: #a9c3d4; margin-bottom: 2px; }
+  .hud-small { font-size: 13px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .hud-gauge { margin-top: 8px; }
+  .hud-bar { height: 8px; background: rgba(255,255,255,.18); border-radius: 4px; overflow: hidden; margin-top: 2px; }
+  .hud-bar-fill { height: 100%; border-radius: 4px; transition: width .2s; }
+  .hud-bar-fill.fuel { background: #54e08a; }
+  .hud-bar-fill.throttle { background: #ffc21c; }
+
+  .hud-compass { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 300px; text-align: center; }
+  .hud-compass-strip { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #d7e6ef; background: rgba(8, 28, 40, .55); border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 4px 10px; }
+  .hud-compass-strip .major { color: #ffc21c; }
+  .hud-compass-needle { color: #ffc21c; font-size: 12px; line-height: 1; margin-top: 2px; }
+  .hud-hdg { font-size: 15px; font-weight: 700; margin-top: 2px; }
+
+  .hud-map-wrap { position: absolute; right: 14px; top: 196px; border: 1px solid rgba(255,255,255,.25); border-radius: 10px; overflow: hidden; background: rgba(8,28,40,.5); }
+  .hud-map { display: block; width: 190px; height: 190px; }
+
+  .hud-message { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 24px; font-weight: 700; color: #ffe9a0; opacity: 0; transition: opacity .25s; text-align: center; white-space: nowrap; }
+  .hud-message.visible { opacity: 1; }
+  .hud-hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #c9dce8; background: rgba(8,28,40,.5); padding: 5px 12px; border-radius: 8px; white-space: nowrap; }
+  .hud-cross { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 20px; color: rgba(255,255,255,.85); }
+  .hud-arrow { position: absolute; top: 58%; left: 50%; font-size: 26px; color: #2fd47c; opacity: 0; }
+  .hud-arrow.visible { opacity: 1; }
+
+  .hud-screen { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(6, 20, 30, .45); pointer-events: auto; }
+  .hud-screen.visible { display: flex; }
+  .hud-card { max-width: 620px; width: calc(100% - 48px); background: rgba(8, 30, 44, .92); border: 1px solid rgba(255,255,255,.25); border-radius: 16px; padding: 28px 34px; color: #eef4f8; box-shadow: 0 18px 60px rgba(0,0,0,.5); }
+  .hud-card h1 { margin: 0 0 4px; font-size: 42px; letter-spacing: .06em; }
+  .hud-sub { margin: 0 0 16px; color: #a9c3d4; font-size: 16px; }
+  .hud-body { font-size: 14px; line-height: 1.55; }
+  .hud-missions { display: grid; gap: 8px; margin-bottom: 12px; }
+  .hud-mission { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 9px 12px; }
+  .hud-mission b { display: block; font-size: 15px; }
+  .hud-mission span { color: #b9cddb; font-size: 13px; }
+  .hud-controls { color: #c9dce8; }
+  .hud-best { font-weight: 700; color: #ffc21c; }
+  .hud-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  .hud-btn { pointer-events: auto; cursor: pointer; font: inherit; font-size: 15px; font-weight: 700; color: #08202e; background: #ffc21c; border: none; border-radius: 10px; padding: 11px 18px; }
+  .hud-btn:hover { background: #ffd34d; }
+  .hud-foot { margin-top: 16px; font-size: 12px; color: #8fa9ba; }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="game" aria-label="Azure Isles Sky Courier: fly the bush plane through rings and land on island airstrips"></canvas>
+  <p id="status" role="status" aria-live="polite"></p>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
